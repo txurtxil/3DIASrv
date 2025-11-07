@@ -1,8 +1,0 @@
-[2025-11-07 23:53:41] Prompt: Soporte teléfono 60°
-[2025-11-07 23:53:41] Iniciando generación (sin timeout)...
-[2025-11-07 23:53:41] Iniciando Node.js...
-[2025-11-07 23:54:34] Node.js finalizado. Código: 1
-STDERR:
-GEMINI_ERROR:No se detectó geometría válida
-
-[2025-11-07 23:54:34] ERROR EN HILO: Gemini falló: No se detectó geometría válida

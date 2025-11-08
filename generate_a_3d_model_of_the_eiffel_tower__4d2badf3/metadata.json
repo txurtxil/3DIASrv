@@ -1,6 +1,0 @@
-{
-  "job_id": "4d2badf3-0bc5-4489-a114-ed114f0dc53d",
-  "prompt": "Generate a 3D model of the Eiffel Tower with exact bounding box dimensions of 50mm width, 50mm depth, and 80mm height. The model must be a realistic, high-detail representation, capturing the intricate wrought-iron lattice, the four structural arches at the base, and the tapering silhouette. Ensure the model is manifold and optimized for 3D printing.\"",
-  "job_name": "generate_a_3d_model_of_the_eiffel_tower__4d2badf3",
-  "timestamp": 1762564035.9194965
-}

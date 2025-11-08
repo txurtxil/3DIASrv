@@ -1,0 +1,210 @@
+// Global Parameters for Eiffel Tower Model
+width = 50;  // Overall model width
+depth = 50;  // Overall model depth
+height = 80; // Overall model height
+min_wall = 2; // Minimum wall thickness for FDM printing
+$fn = 24;    // Facets for curves, as required
+
+// Main Entry Point: Generates the Eiffel Tower model.
+// The entire model's bounding box will be centered at (0,0,0).
+// This means the Z range will be from -height/2 to height/2.
+// Internal Z references for construction will be relative to the model's actual base (0 to height).
+eiffel_tower_model();
+
+module eiffel_tower_model() {
+    // Internal Z references for construction will be from 0 to `height`.
+    // After construction, the whole model will be translated by [0, 0, -height/2]
+    // so its geometric center is at (0,0,0).
+
+    // Proportional heights for different sections, relative to total height.
+    // These define the start (base) of each major segment.
+    h_base_bottom = 0; // The conceptual base level for construction
+    h_platform1_base = height * 0.40; // Z-coordinate for the base of the first platform
+    h_platform2_base = height * 0.70; // Z-coordinate for the base of the second platform
+    h_spire_base = height * 0.90; // Z-coordinate for the base of the final spire
+    h_top_tip = height;           // Z-coordinate for the very top of the spire
+
+    // Thickness for platforms and other horizontal elements
+    platform_thickness = min_wall * 2;
+
+    // Side dimensions (square footprint) at key heights.
+    // These are *outer* dimensions for the structural elements.
+    base_outer_side = width * 0.98; // Close to full width/depth at the base
+    platform1_side = width * 0.6;   // Width of the first platform
+    platform2_side = width * 0.35;  // Width of the second platform
+    spire_base_side = width * 0.15; // Width at the base of the spire
+    spire_tip_radius = min_wall * 0.5; // Radius of the very top point of the spire
+
+    // All model components are grouped here, then translated to center the bounding box.
+    translate([0, 0, -height/2]) { // Shift the entire model down so its geometric center is at (0,0,0)
+        union() {
+            // --- Lower Section: Legs and Arches ---
+            // This module constructs the tapering legs, horizontal bracing, and iconic arches
+            // for the lowest part of the tower, from the base up to the first platform.
+            module lower_tower_section(z_start, z_end, outer_s_bottom, outer_s_top, platform_t, wall_t) {
+                local_height = z_end - z_start;
+
+                // Four main corner posts (legs) tapering inwards.
+                // Uses `hull` to create smooth tapered beams between two square bases.
+                for (i = [0, 90, 180, 270]) {
+                    rotate([0, 0, i]) {
+                        hull() {
+                            // Base of the leg (thicker)
+                            translate([outer_s_bottom/2 - wall_t * 2, outer_s_bottom/2 - wall_t * 2, z_start])
+                                cube([wall_t * 4, wall_t * 4, 0.01]); // 0.01 height for hull to work
+                            // Top of the leg (thinner)
+                            translate([outer_s_top/2 - wall_t, outer_s_top/2 - wall_t, z_end - platform_t])
+                                cube([wall_t * 2, wall_t * 2, 0.01]); // 0.01 height for hull to work
+                        }
+                    }
+                }
+
+                // Horizontal connecting beams for structural integrity.
+                // These beams connect the legs at different heights.
+                num_lower_beams = 3; // Number of horizontal layers in this section
+                for (j = [0 : num_lower_beams]) {
+                    current_z = z_start + (local_height / (num_lower_beams + 1)) * j;
+                    // Scale beam length based on current height for tapering effect
+                    current_side_len = outer_s_bottom - (outer_s_bottom - outer_s_top) * ((current_z - z_start) / local_height);
+                    translate([0, 0, current_z]) {
+                        // Beams along X-axis
+                        cube([current_side_len - wall_t*2, wall_t*2, wall_t], center=true);
+                        // Beams along Y-axis
+                        cube([wall_t*2, current_side_len - wall_t*2, wall_t], center=true);
+                    }
+                }
+                
+                // Main Arches: Four prominent arches connecting the legs on each side.
+                // These are created using a `difference` operation on a solid block and cylinders.
+                arch_base_width = outer_s_bottom * 0.7; // Overall width of the arch at its base
+                arch_height_span = local_height * 0.5; // Effective height of the arch curve
+                arch_z_offset = z_start + local_height * 0.1; // Vertical offset from the base of the tower
+
+                for (i = [0, 90, 180, 270]) {
+                    rotate([0, 0, i]) {
+                        // Position the arch block for cutting
+                        translate([-arch_base_width/2, outer_s_bottom/2 - wall_t * 1.5, arch_z_offset]) {
+                            difference() {
+                                // Main structural block from which the arch is carved
+                                cube([arch_base_width, wall_t * 3, arch_height_span]); // Thick block
+
+                                // Cut out the inner arch curve using a cylinder
+                                // The cylinder's center is placed at the top of the desired arch height.
+                                translate([arch_base_width/2, wall_t * 1.5, arch_height_span - (arch_base_width/2)]) {
+                                    cylinder(r = arch_base_width/2 - wall_t, h = wall_t * 5, center = true); // Main arc cut
+                                }
+                                // Cut off the bottom half of the cylinder's effect to finalize the arch shape
+                                translate([0, wall_t * 1.5, -arch_height_span*0.5]) {
+                                    cube([arch_base_width, wall_t * 5, arch_height_span]);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            lower_tower_section(h_base_bottom, h_platform1_base, base_outer_side, platform1_side, platform_thickness, min_wall);
+
+
+            // --- First Platform ---
+            // A solid square platform at the first level.
+            translate([0, 0, h_platform1_base - platform_thickness]) {
+                platform_solid(platform1_side, platform_thickness);
+            }
+
+            // --- Middle Section: Tapering Lattice ---
+            // This module creates a section with tapering main beams, horizontal connectors,
+            // and diagonal cross-bracing, from the first to the second platform.
+            module tapering_lattice_section(z_start, z_end, bottom_s, top_s, platform_t, wall_t) {
+                local_height = z_end - z_start;
+
+                // Four main corner beams, tapering inwards.
+                for (i = [0, 90, 180, 270]) {
+                    rotate([0, 0, i]) {
+                        hull() {
+                            // Base of the corner beam (thicker)
+                            translate([bottom_s/2 - wall_t*1.5, bottom_s/2 - wall_t*1.5, z_start])
+                                cube([wall_t*3, wall_t*3, 0.01]);
+                            // Top of the corner beam (thinner)
+                            translate([top_s/2 - wall_t, top_s/2 - wall_t, z_end - platform_t])
+                                cube([wall_t*2, wall_t*2, 0.01]);
+                        }
+                    }
+                }
+
+                // Horizontal connecting beams for structural stability.
+                num_horiz_beams = 2; // Number of horizontal layers in this section
+                for (j = [0 : num_horiz_beams]) {
+                    current_z = z_start + (local_height / (num_horiz_beams + 1)) * (j + 1);
+                    current_side_len = bottom_s - (bottom_s - top_s) * ((current_z - z_start) / local_height);
+                    translate([0, 0, current_z]) {
+                        cube([current_side_len - wall_t*2, wall_t*2, wall_t], center=true);
+                        cube([wall_t*2, current_side_len - wall_t*2, wall_t], center=true);
+                    }
+                }
+
+                // Diagonal cross-bracing (simplified lattice pattern).
+                num_diag_sections = 2; // Split height into segments for diagonals
+                segment_h = local_height / num_diag_sections;
+                for (k = [0 : num_diag_sections-1]) {
+                    seg_z_start = z_start + k * segment_h;
+                    seg_z_end = seg_z_start + segment_h;
+
+                    // Calculate side lengths for the current segment
+                    seg_bottom_s = bottom_s - (bottom_s - top_s) * ((seg_z_start - z_start) / local_height);
+                    seg_top_s = bottom_s - (bottom_s - top_s) * ((seg_z_end - z_start) / local_height);
+
+                    for (i = [0, 90, 180, 270]) {
+                        rotate([0, 0, i]) {
+                            // Two diagonal beams forming an 'X' on each side, using hull for taper.
+                            hull() {
+                                translate([seg_bottom_s/2 - wall_t, -seg_bottom_s/2 + wall_t, seg_z_start]) cube([wall_t*2, wall_t*2, 0.01]);
+                                translate([-seg_top_s/2 + wall_t, seg_top_s/2 - wall_t, seg_z_end]) cube([wall_t*2, wall_t*2, 0.01]);
+                            }
+                            hull() {
+                                translate([-seg_bottom_s/2 + wall_t, -seg_bottom_s/2 + wall_t, seg_z_start]) cube([wall_t*2, wall_t*2, 0.01]);
+                                translate([seg_top_s/2 - wall_t, seg_top_s/2 - wall_t, seg_z_end]) cube([wall_t*2, wall_t*2, 0.01]);
+                            }
+                        }
+                    }
+                }
+            }
+            tapering_lattice_section(h_platform1_base, h_platform2_base, platform1_side, platform2_side, platform_thickness, min_wall);
+
+
+            // --- Second Platform ---
+            // A solid square platform at the second level.
+            translate([0, 0, h_platform2_base - platform_thickness]) {
+                platform_solid(platform2_side, platform_thickness);
+            }
+
+            // --- Top Section: Tapering Lattice ---
+            // This module constructs the upper tapering section, from the second platform
+            // up to the base of the final spire.
+            tapering_lattice_section(h_platform2_base, h_spire_base, platform2_side, spire_base_side, platform_thickness, min_wall);
+
+            // --- Spire ---
+            // This module constructs the very top spire of the tower.
+            module top_spire_section(z_start, z_end, base_s, tip_r, wall_t) {
+                local_height = z_end - z_start;
+                // Main central mast of the spire (tapering cylinder)
+                translate([0, 0, z_start + local_height/2]) {
+                    cylinder(r1 = base_s / 2, r2 = tip_r, h = local_height, center = true);
+                }
+                // Simple cross-bracing for the spire for added detail.
+                for (z_lvl_offset = [local_height * 0.3, local_height * 0.7]) {
+                    current_radius_at_z = (base_s/2) - ((base_s/2) - tip_r) * (z_lvl_offset / local_height);
+                    translate([0, 0, z_start + z_lvl_offset]) {
+                        cube([current_radius_at_z*2 - wall_t, wall_t, wall_t], center=true);
+                        cube([wall_t, current_radius_at_z*2 - wall_t, wall_t], center=true);
+                    }
+                }
+            }
+            top_spire_section(h_spire_base, h_top_tip, spire_base_side, spire_tip_radius, min_wall);
+        } // End of main union
+    } // End of translate for centering
+
+    // Helper module for a solid square platform
+    module platform_solid(side_length, thickness) {
+        cube([side_length, side_length, thickness], center = true);
+    }
+}
